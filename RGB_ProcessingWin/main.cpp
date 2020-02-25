@@ -22,44 +22,48 @@ using namespace std;
 using namespace tbb;
 
 
+struct pixel_rgb
+{
+	alignas(1) unsigned char r = 0;
+	alignas(1) unsigned char g = 0;
+	alignas(1) unsigned char b = 0;
+};
+
+
 // PART 1
 
-// serial solution
-bool CombineImagesSerial(char* inImagePathA, char* inImagePathB, char* outImagePath, function<float (float, float)> fn)
+// serial solution (using pixel_rgb type)
+bool CombineImagesSerial(char* inImagePathA, char* inImagePathB, char* outImagePath, function<pixel_rgb(pixel_rgb, pixel_rgb)> fn)
 {
 	// Load input images from disk as FreeImagePlus images
 	fipImage imgInA;
 	fipImage imgInB;
 	imgInA.load(inImagePathA);
 	imgInB.load(inImagePathB);
-	imgInA.convertToFloat();
-	imgInB.convertToFloat();
+	imgInA.convertTo24Bits();
+	imgInB.convertTo24Bits();
 
 	// Both input images must have the same dimensions
 	if (imgInA.getWidth() != imgInB.getWidth() || imgInA.getHeight() != imgInB.getHeight()) return false;
 
 	// Create an empty output image with the same dimensions as the inputs
-	uint64_t width = imgInA.getWidth();
-	uint64_t height = imgInA.getHeight();
-	uint64_t numPixels = width * height; // TODO: possibility of overflow
-	fipImage imgOut(FIT_FLOAT, width, height, 32); // TODO: hardcoding bits per pixel, should consider dynamically checking size of floats
+	unsigned int width = imgInA.getWidth();
+	unsigned int height = imgInA.getHeight();
+	unsigned int numPixels = width * height;
 
 	// Iterate over each pixel and apply the given function
-	float* aPointer = (float*)imgInA.accessPixels();
-	float* bPointer = (float*)imgInB.accessPixels();
-	float* outPointer = (float*)imgOut.accessPixels();
-	for (uint64_t pixel = 0; pixel < numPixels; pixel++, aPointer++, bPointer++, outPointer++)
+	pixel_rgb* aPointer = (pixel_rgb*)imgInA.accessPixels(); // also acts as the output image
+	pixel_rgb* bPointer = (pixel_rgb*)imgInB.accessPixels();
+	for (uint64_t pixel = 0; pixel < numPixels; pixel++, aPointer++, bPointer++)
 	{
-		*outPointer = fn(*aPointer, *bPointer);
+		*aPointer = fn(*aPointer, *bPointer);
 	}
 
 	// Save output image to disk
-	imgOut.convertToType(FREE_IMAGE_TYPE::FIT_BITMAP);
-	imgOut.convertTo24Bits();
-	return imgOut.save(outImagePath);
+	return imgInA.save(outImagePath);
 }
 
-// parallel solution
+// parallel solution (using float)
 void CombineSubImage(float* aPointer, float* bPointer, float* outPointer, uint64_t numIterations, function<float(float, float)> fn)
 {
 	for (uint64_t pixel = 0; pixel < numIterations; pixel++, aPointer++, bPointer++, outPointer++)
@@ -68,7 +72,7 @@ void CombineSubImage(float* aPointer, float* bPointer, float* outPointer, uint64
 	}
 }
 
-// parallel solution
+// parallel solution (using float)
 bool CombineImagesParallel(char* inImagePathA, char* inImagePathB, char* outImagePath, uint64_t numThreads, function<float(float, float)> fn)
 {
 	// Load input images from disk as FreeImagePlus images
@@ -192,51 +196,47 @@ bool ProcessImageStencilSerial(char* inImagePath, char* outImagePath, int kradiu
 	imgIn.convertToFloat();
 
 	// Load empty output image into memory
-	uint64_t width = imgIn.getWidth();
-	uint64_t height = imgIn.getHeight();
-	uint64_t numPixels = width * height;
+	unsigned int width = imgIn.getWidth();
+	unsigned int height = imgIn.getHeight();
+	unsigned int numPixels = width * height;
 	fipImage imgOut(FIT_FLOAT, width, height, 32);
 
 	// Setup variables for accessing memory
 	float* inPointer = (float*)imgIn.accessPixels();
 	float* outPointer = (float*)imgOut.accessPixels();
-	int xOrigin = 0;
-	int yOrigin = 0;
-	uint64_t stencilHead = 0;
-	float sum = 0.0f;
+	float sum;
+	unsigned int stencilIndex = 0;
 
 	// Iterate over all pixels linearly
-	for (uint64_t pixel = 0; pixel < numPixels; pixel++, xOrigin++, outPointer++)
+	for (unsigned int xOrigin = 0; xOrigin < width; xOrigin++)
 	{
-		if (xOrigin >= width)
+		for (unsigned int yOrigin = 0; yOrigin < height; yOrigin++, outPointer++)
 		{
-			xOrigin = 0;
-			yOrigin++;
-		}
-		sum = 0.0f;
-		for (int yStencil = -(kradius); yStencil <= kradius; yStencil++)
-		{
-			int relYStencil = yOrigin + yStencil;
-			if (relYStencil < 0) relYStencil = 0;
-			else if (relYStencil >= height) relYStencil = height - 1;
-			relYStencil = relYStencil * width;
+			sum = 0.0f;
 
-			for (int xStencil = -(kradius); xStencil <= kradius; xStencil++)
+			for (int yStencil = -(kradius); yStencil <= kradius; yStencil++)
 			{
-				int relXStencil = xOrigin + xStencil;
-				if (relXStencil < 0) relXStencil = 0;
-				else if (relXStencil >= width) relXStencil = width - 1;
-				stencilHead = relYStencil + relXStencil;
+				// Make sure that the stencil's y-coord is within range. If not, snap to the nearest border pixel.
+				int absoluteYStencil = (int)yOrigin + yStencil;
+				if (absoluteYStencil < 0) absoluteYStencil = 0;
+				else if (absoluteYStencil >= height) absoluteYStencil = height - 1;
 
-				sum += inPointer[stencilHead] * STask(xStencil, yStencil);
+				for (int xStencil = -(kradius); xStencil <= kradius; xStencil++)
+				{
+					// Make sure that the stencil's x-coord is within range. If not, snap to the nearest border pixel.
+					int absoluteXStencil = xOrigin + xStencil;
+					if (absoluteXStencil < 0) absoluteXStencil = 0;
+					else if (absoluteXStencil >= width) absoluteXStencil = width - 1;
+
+					stencilIndex = (absoluteYStencil * width) + absoluteXStencil;
+					sum += inPointer[stencilIndex] * STask(xStencil, yStencil);
+				}
 			}
+			*outPointer = sum;
 		}
-		*outPointer = sum;
 	}
 
 	// Save output image to disk
-	imgOut.convertToType(FREE_IMAGE_TYPE::FIT_BITMAP);
-	imgOut.convertTo24Bits();
 	return imgOut.save(outImagePath);
 }
 
@@ -248,9 +248,9 @@ bool ProcessImageStencilParallel(char* inImagePath, char* outImagePath, int krad
 	imgIn.convertToFloat();
 
 	// Load empty output image into memory
-	uint64_t width = imgIn.getWidth();
-	uint64_t height = imgIn.getHeight();
-	uint64_t numPixels = width * height;
+	unsigned int width = imgIn.getWidth();
+	unsigned int height = imgIn.getHeight();
+	unsigned int numPixels = width * height;
 	fipImage imgOut(FIT_FLOAT, width, height, 32);
 
 	// Iterate over all pixels using TBB parallel_for
@@ -296,35 +296,31 @@ bool ProcessImageStencilParallel(char* inImagePath, char* outImagePath, int krad
 }
 
 // serial linear operation solution
-bool ApplyToImageSerial(char* inImagePath, char* outImagePath, function<float(float)> fn)
+bool ApplyToImageSerial(char* inImagePath, char* outImagePath, function<pixel_rgb(pixel_rgb)> fn)
 {
 	// Load input images from disk as FreeImagePlus images
 	fipImage imgIn;
 	imgIn.load(inImagePath);
-	imgIn.convertToFloat();
+	imgIn.convertTo24Bits();
 
 	// Create an empty output image with the same dimensions as the inputs
-	uint64_t width = imgIn.getWidth();
-	uint64_t height = imgIn.getHeight();
-	uint64_t numPixels = width * height; // TODO: possibility of overflow
-	fipImage imgOut(FIT_FLOAT, width, height, 32); // TODO: hardcoding bits per pixel, should consider dynamically checking size of floats
+	unsigned int width = imgIn.getWidth();
+	unsigned int height = imgIn.getHeight();
+	unsigned int numPixels = width * height;
 
 	// Iterate over each pixel and apply the given function
-	float* inPointer = (float*)imgIn.accessPixels();
-	float* outPointer = (float*)imgOut.accessPixels();
-	for (uint64_t pixel = 0; pixel < numPixels; pixel++, inPointer++, outPointer++)
+	pixel_rgb* inPointer = (pixel_rgb*)imgIn.accessPixels();
+	for (unsigned int pixel = 0; pixel < numPixels; pixel++, inPointer++)
 	{
-		*outPointer = fn(*inPointer);
+		*inPointer = fn(*inPointer);
 	}
 
 	// Save output image to disk
-	imgOut.convertToType(FREE_IMAGE_TYPE::FIT_BITMAP);
-	imgOut.convertTo24Bits();
-	return imgOut.save(outImagePath);
+	return imgIn.save(outImagePath);
 }
 
 // parallel linear operation solution
-bool ApplyToImageParallel(char* inImagePath, char* outImagePath, function<float(float)> fn)
+bool ApplyToImageParallel(char* inImagePath, char* outImagePath, function<pixel_rgb(pixel_rgb)> fn)
 {
 	// Load input images from disk as FreeImagePlus images
 	fipImage imgIn;
@@ -332,14 +328,14 @@ bool ApplyToImageParallel(char* inImagePath, char* outImagePath, function<float(
 	imgIn.convertToFloat();
 
 	// Create an empty output image with the same dimensions as the inputs
-	uint64_t width = imgIn.getWidth();
-	uint64_t height = imgIn.getHeight();
-	uint64_t numPixels = width * height; // TODO: possibility of overflow
-	fipImage imgOut(FIT_FLOAT, width, height, 32); // TODO: hardcoding bits per pixel, should consider dynamically checking size of floats
+	unsigned int width = imgIn.getWidth();
+	unsigned int height = imgIn.getHeight();
+	unsigned int numPixels = width * height; 
+	fipImage imgOut(FIT_BITMAP, width, height, 24); 
 
 	// Iterate over each pixel and apply the given function
-	float* inPointer = (float*)imgIn.accessPixels();
-	float* outPointer = (float*)imgOut.accessPixels();
+	pixel_rgb* inPointer = (pixel_rgb*)imgIn.accessPixels();
+	pixel_rgb* outPointer = (pixel_rgb*)imgOut.accessPixels();
 	parallel_for(blocked_range<int>(0, (int)numPixels, 1024), [&](const blocked_range<int>& range) {
 		for (int i = range.begin(); i < range.end(); i++)
 		{
@@ -348,8 +344,6 @@ bool ApplyToImageParallel(char* inImagePath, char* outImagePath, function<float(
 	});
 
 	// Save output image to disk
-	imgOut.convertToType(FREE_IMAGE_TYPE::FIT_BITMAP);
-	imgOut.convertTo24Bits();
 	return imgOut.save(outImagePath);
 }
 
@@ -357,17 +351,18 @@ bool ApplyToImageParallel(char* inImagePath, char* outImagePath, function<float(
 
 // PART 3
 
-int PixelsThatMeetCriteriaSerial(char* inImagePath, function<bool(float)> fn)
+int PixelsThatMeetCriteriaSerial(char* inImagePath, function<bool(unsigned char)> fn)
 {
 	// Load input images from disk as FreeImagePlus images
 	fipImage imgIn;
 	imgIn.load(inImagePath);
-	imgIn.convertToFloat();
-	uint64_t numPixels = imgIn.getWidth() * imgIn.getHeight();
+	imgIn.convertToGrayscale();
+	unsigned int numPixels = imgIn.getWidth() * imgIn.getHeight();
 
 	int sum = 0;
-	float* inPointer = (float*)imgIn.accessPixels();
-	for (int pixel = 0; pixel < numPixels; pixel++, inPointer++)
+	// A grayscale image contains 8 bits per pixel, which is the same as a char (signed or unsigned).
+	unsigned char* inPointer = (unsigned char*)imgIn.accessPixels();
+	for (unsigned int pixel = 0; pixel < numPixels; pixel++, inPointer++)
 	{
 		if (fn(*inPointer)) sum++;
 	}
@@ -410,24 +405,22 @@ bool MaskInvertSerial(char* inImagePath, char* maskImagePath, char* outImagePath
 	fipImage imgMask;
 	imgIn.load(inImagePath);
 	imgMask.load(maskImagePath);
-	imgIn.convertToFloat();
-	imgMask.convertToFloat();
+	imgIn.convertToGrayscale();
+	imgMask.convertToGrayscale();
 
-	uint64_t width = imgIn.getWidth();
-	uint64_t height = imgMask.getHeight();
-	uint64_t numPixels = width * height;
-	fipImage imgOut(FIT_FLOAT, width, height, 32);
+	unsigned int width = imgIn.getWidth();
+	unsigned int height = imgMask.getHeight();
+	unsigned int numPixels = width * height;
 
-	float* inPointer = (float*)imgIn.accessPixels();
-	float* maskPointer = (float*)imgMask.accessPixels();
-	for (uint64_t pixel = 0; pixel < numPixels; pixel++, inPointer++, maskPointer++)
+	unsigned char* inPointer = (unsigned char*)imgIn.accessPixels();
+	unsigned char* maskPointer = (unsigned char*)imgMask.accessPixels();
+	for (unsigned int pixel = 0; pixel < numPixels; pixel++, inPointer++, maskPointer++)
 	{
-		if (*inPointer > 0.5f)
-		{
-			cout << *inPointer << endl;
-		}
+		// Check if mask pixel is white. If it is, invert 
+		if (*maskPointer == (unsigned char)0) *inPointer = ((unsigned char)255) - *inPointer;
 	}
-	return false;
+	
+	return imgIn.save(outImagePath);
 }
 
 
@@ -439,7 +432,6 @@ int main()
 	int nt = task_scheduler_init::default_num_threads();
 	task_scheduler_init T(nt);
 
-	cout << "DEBUG: " << sizeof(float) << endl;
 	
 	//Part 1 (Image Comparison): -----------------DO NOT REMOVE THIS COMMENT----------------------------//
 
@@ -456,6 +448,29 @@ int main()
 	auto and = [](float a, float b)->float { if (a == b) return 1.0f; else return 0.0f; };
 	auto sum = [](float a, float b)->float { return (a/2.0f) + (b/2.0f); };
 
+	auto and_rgb = [](pixel_rgb a, pixel_rgb b)->pixel_rgb { 
+		pixel_rgb output;
+		if (a.r == b.r && a.g == b.g && a.b == b.b) {
+			output.r = (unsigned char)255;
+			output.g = (unsigned char)255;
+			output.b = (unsigned char)255;
+		}
+		else {
+			output.r = (unsigned char)0;
+			output.g = (unsigned char)0;
+			output.b = (unsigned char)0;
+		}
+		return output;
+	};
+
+	auto sum_rgb = [](pixel_rgb a, pixel_rgb b)->pixel_rgb {
+		pixel_rgb output;
+		output.r = (a.r / (unsigned char)2) + (b.r / (unsigned char)2);
+		output.g = (a.g / (unsigned char)2) + (b.g / (unsigned char)2);
+		output.b = (a.b / (unsigned char)2) + (b.b / (unsigned char)2);
+		return output;
+	};
+
 	char answer = 'N';
 
 	cout << "Run part 1 (Y/N)? ";
@@ -468,9 +483,9 @@ int main()
 		{
 			// Sequential solution:
 			std::chrono::steady_clock::time_point begins = std::chrono::steady_clock::now();
-			CombineImagesSerial(TOP_1, TOP_2, OUT_STAGE_1_A, and);
-			CombineImagesSerial(BOTTOM_1, BOTTOM_2, OUT_STAGE_1_B, and);
-			CombineImagesSerial(OUT_STAGE_1_A, OUT_STAGE_1_B, OUT_STAGE_1_COMBINED, sum);
+			CombineImagesSerial(TOP_1, TOP_2, OUT_STAGE_1_A, and_rgb);
+			CombineImagesSerial(BOTTOM_1, BOTTOM_2, OUT_STAGE_1_B, and_rgb);
+			CombineImagesSerial(OUT_STAGE_1_A, OUT_STAGE_1_B, OUT_STAGE_1_COMBINED, sum_rgb);
 			std::chrono::steady_clock::time_point ends = std::chrono::steady_clock::now();
 			
 			auto durations = chrono::duration_cast<std::chrono::microseconds>(ends - begins).count();
@@ -516,7 +531,13 @@ int main()
 	char OUT_STAGE_2_THRESHOLD[] = "../Images/stage2_threshold.png";
 	
 	// Lambda functions for part 2
-	auto binaryThreshold = [](float x)->float{ if (x < 1.0f) return 0.0f; else return x; };
+	auto binaryThreshold2 = [](pixel_rgb x)->pixel_rgb { 
+		pixel_rgb black;
+		pixel_rgb white;
+		white.r, white.g, white.b = 255, 255, 255;
+		if (x.r != 0 || x.g != 0 || x.b != 0) return white;
+		else return black;
+	};
 
 	cout << "Run part 2 (Y/N)? ";
 	cin >> answer;
@@ -535,7 +556,7 @@ int main()
 			cout << "Duration for serial stencil" << ": " << durations << " milliseconds" << endl;
 
 			std::chrono::steady_clock::time_point begint = std::chrono::steady_clock::now();
-			ApplyToImageSerial(OUT_STAGE_2_BLURRED, OUT_STAGE_2_THRESHOLD, binaryThreshold);
+			ApplyToImageSerial(OUT_STAGE_2_BLURRED, OUT_STAGE_2_THRESHOLD, binaryThreshold2);
 			std::chrono::steady_clock::time_point endt = std::chrono::steady_clock::now();
 
 			auto durationt = chrono::duration_cast<std::chrono::milliseconds>(endt - begint).count();
@@ -548,7 +569,7 @@ int main()
 		{
 			// Parallel solutions
 			std::chrono::steady_clock::time_point begins = std::chrono::steady_clock::now();
-			ProcessImageStencilParallel(OUT_STAGE_1_COMBINED, OUT_STAGE_2_BLURRED, 2, GaussianBlur(0.8f, 5));
+			//ProcessImageStencilParallel(OUT_STAGE_1_COMBINED, OUT_STAGE_2_BLURRED, 2, GaussianBlur(0.8f, 5));
 			std::chrono::steady_clock::time_point ends = std::chrono::steady_clock::now();
 
 			auto durations = chrono::duration_cast<std::chrono::milliseconds>(ends - begins).count();
@@ -563,7 +584,7 @@ int main()
 			//  Average : 28560 (28.6 seconds)
 
 			std::chrono::steady_clock::time_point begint = std::chrono::steady_clock::now();
-			ApplyToImageParallel(OUT_STAGE_2_BLURRED, OUT_STAGE_2_THRESHOLD, binaryThreshold);
+			ApplyToImageParallel(OUT_STAGE_2_BLURRED, OUT_STAGE_2_THRESHOLD, binaryThreshold2);
 			std::chrono::steady_clock::time_point endt = std::chrono::steady_clock::now();
 
 			auto durationt = chrono::duration_cast<std::chrono::milliseconds>(endt - begint).count();
@@ -577,6 +598,7 @@ int main()
 
 	// Lambdas for part 3
 	auto checkPixelIsWhite = [](float x)->bool { if (x <= 0.0f) return true; else return false; };
+	auto checkPixelIsWhiteGrayscale = [](unsigned char x)->bool { if (x == (unsigned char)0) return true; else return false; };
 
 	cout << "Run part 3 (Y/N)? ";
 	cin >> answer;
@@ -586,9 +608,9 @@ int main()
 		cin >> answer;
 		if (answer == 'Y' || answer == 'y')
 		{
-			//int vals = PixelsThatMeetCriteriaSerial(OUT_STAGE_2_THRESHOLD, checkPixelIsWhite);
-			//cout << vals << " white pixels" << endl;
-			//cout << ((float)vals / (5000.0f * 7000.0f)) * 100.0f << "%";
+			int vals = PixelsThatMeetCriteriaSerial(OUT_STAGE_2_THRESHOLD, checkPixelIsWhiteGrayscale);
+			cout << vals << " white pixels" << endl;
+			cout << ((float)vals / (5000.0f * 7000.0f)) * 100.0f << "%";
 
 			MaskInvertSerial(TOP_1, OUT_STAGE_2_THRESHOLD, OUT_STAGE_3);
 		}
