@@ -477,29 +477,33 @@ int main()
 	int nt = task_scheduler_init::default_num_threads();
 	task_scheduler_init T(nt);
 
-	char TOP_1[] = "../Images/render_top_1.png";
-	char TOP_2[] = "../Images/render_top_2.png";
-	char BOTTOM_1[] = "../Images/render_bottom_1.png";
-	char BOTTOM_2[] = "../Images/render_bottom_2.png";
-	char OUT_STAGE_1_A[] = "../Images/stage1_top.png";
-	char OUT_STAGE_1_B[] = "../Images/stage1_bottom.png";
+	// Image file paths
+	char IN_TOP_1[] = "../Images/render_top_1.png";
+	char IN_TOP_2[] = "../Images/render_top_2.png";
+	char IN_BOTTOM_1[] = "../Images/render_bottom_1.png";
+	char IN_BOTTOM_2[] = "../Images/render_bottom_2.png";
+	char OUT_STAGE_1_TOP[] = "../Images/stage1_top.png";
+	char OUT_STAGE_1_BOTTOM[] = "../Images/stage1_bottom.png";
 	char OUT_STAGE_1_COMBINED[] = "../Images/stage1_combined.png";
 	char OUT_STAGE_2_BLURRED[] = "../Images/stage2_blurred.png";
 	char OUT_STAGE_2_THRESHOLD[] = "../Images/stage2_threshold.png";
 	char OUT_STAGE_3[] = "../Images/stage3_final.png";
 
-	const int STAGE_1_SEQ_ITERATIONS = 0;
-	const int STAGE_1_PAR_ITERATIONS = 0;
-	const int STAGE_2_SEQ_ITERATIONS = 0;
-	const int STAGE_2_PAR_ITERATIONS = 0;
-	const int STAGE_3_SEQ_ITERATIONS = 1;
-	const int STAGE_3_PAR_ITERATIONS = 0;
+	// Number of times each stage will be executed
+	const int STAGE_1_SEQ_ITERATIONS = 5;
+	const int STAGE_1_PAR_ITERATIONS = 5;
+	const int STAGE_2_SEQ_ITERATIONS = 5;
+	const int STAGE_2_PAR_ITERATIONS = 5;
+	const int STAGE_3_SEQ_ITERATIONS = 5;
+	const int STAGE_3_PAR_ITERATIONS = 5;
 	std::chrono::steady_clock::time_point start;
 	std::chrono::steady_clock::time_point end;
+	float average = 0.0f;
 
 	
 	//Part 1 (Image Comparison): -----------------DO NOT REMOVE THIS COMMENT----------------------------//
 	
+
 	// IF pixel 'a' is the same as pixel 'b', return a black pixel. Otherwise return a white one
 	auto and = [](pixel_rgb a, pixel_rgb b)->pixel_rgb 
 	{ 
@@ -535,34 +539,45 @@ int main()
 	for (int i = 0; i < STAGE_1_SEQ_ITERATIONS; i++)
 	{
 		start = std::chrono::steady_clock::now();
-		CombineImagesSerial(TOP_1, TOP_2, OUT_STAGE_1_A, and);
-		CombineImagesSerial(BOTTOM_1, BOTTOM_2, OUT_STAGE_1_B, and);
-		CombineImagesSerial(OUT_STAGE_1_A, OUT_STAGE_1_B, OUT_STAGE_1_COMBINED, sum);
+		CombineImagesSerial(IN_TOP_1, IN_TOP_2, OUT_STAGE_1_TOP, and);
+		CombineImagesSerial(IN_BOTTOM_1, IN_BOTTOM_2, OUT_STAGE_1_BOTTOM, and);
+		CombineImagesSerial(OUT_STAGE_1_TOP, OUT_STAGE_1_BOTTOM, OUT_STAGE_1_COMBINED, sum);
 		end = std::chrono::steady_clock::now();
 
 		auto duration_p1_s = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << "  Run " << i+1 << ": " << duration_p1_s << "ms" << endl;
+		average += (float)duration_p1_s;
 	}
-	cout << endl;
+
+	if (STAGE_1_SEQ_ITERATIONS > 0) average = average / (float)STAGE_1_SEQ_ITERATIONS;
+	cout << "Average: " << average << endl << endl;
+	average = 0.0f;
+
 
 	// Part 1 parallel solution:
 	cout << "Part one (parallel) (" << STAGE_1_PAR_ITERATIONS << " runs):" << endl;
 	for (int i = 0; i < STAGE_1_PAR_ITERATIONS; i++)
 	{
 		start = std::chrono::steady_clock::now();
-		CombineImagesParallel(TOP_1, TOP_2, OUT_STAGE_1_A, nt, and);
-		CombineImagesParallel(BOTTOM_1, BOTTOM_2, OUT_STAGE_1_B, nt, and);
-		CombineImagesParallel(OUT_STAGE_1_A, OUT_STAGE_1_B, OUT_STAGE_1_COMBINED, nt, sum);
+		CombineImagesParallel(IN_TOP_1, IN_TOP_2, OUT_STAGE_1_TOP, nt, and);
+		CombineImagesParallel(IN_BOTTOM_1, IN_BOTTOM_2, OUT_STAGE_1_BOTTOM, nt, and);
+		CombineImagesParallel(OUT_STAGE_1_TOP, OUT_STAGE_1_BOTTOM, OUT_STAGE_1_COMBINED, nt, sum);
 		end = std::chrono::steady_clock::now();
 
 		auto duration_p1_p = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << "  Run " << i+1 << ": " << duration_p1_p << "ms" << endl;
+		average += (float)duration_p1_p;
 	}
-	cout << endl;
+
+	if (STAGE_1_PAR_ITERATIONS > 0) average = average / (float)STAGE_1_PAR_ITERATIONS;
+	cout << "Average: " << average << endl << endl;
+	average = 0.0f;
 
 
 	//Part 2 (Blur & post-processing): -----------DO NOT REMOVE THIS COMMENT----------------------------//
 	
+
+	// blur parameters
 	float sigma = 0.8f;
 	int kernal_radius = 1;
 
@@ -592,8 +607,13 @@ int main()
 
 		auto duration_p2_s2 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << "(threshold) " << ": " << duration_p2_s2 << "ms" << endl;
+		average += (float)duration_p2_s1 + (float)duration_p2_s2;
 	}
-	cout << endl;
+
+	if (STAGE_2_SEQ_ITERATIONS > 0) average = average / (float)STAGE_2_SEQ_ITERATIONS;
+	cout << "Average: " << average << endl << endl;
+	average = 0.0f;
+
 
 	// Part 2 parallel solution:
 	cout << "Part two (parallel) (" << STAGE_2_PAR_ITERATIONS << " runs): " << endl;
@@ -612,11 +632,16 @@ int main()
 
 		auto duration_p2_p2 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << "(threshold) " << ": " << duration_p2_p2 << "ms" << endl;
+		average += (float)duration_p2_p1 + (float)duration_p2_p2;
 	}
-	cout << endl;
+
+	if (STAGE_2_PAR_ITERATIONS > 0) average = average / (float)STAGE_2_PAR_ITERATIONS;
+	cout << "Average: " << average << endl << endl;
+	average = 0.0f;
 
 
 	//Part 3 (Image Mask): -----------------------DO NOT REMOVE THIS COMMENT----------------------------//
+
 
 	// IF pixel 'x' is white, return true. Otherwise return false
 	auto checkPixelIsWhite = [](pixel_rgb x)->bool {
@@ -639,13 +664,17 @@ int main()
 		cout << duration_p3_s1 << "ms, ";
 
 		start = std::chrono::steady_clock::now();
-		MaskInvertSerial(TOP_1, OUT_STAGE_2_THRESHOLD, OUT_STAGE_3, checkPixelIsWhite);
+		MaskInvertSerial(IN_TOP_1, OUT_STAGE_2_THRESHOLD, OUT_STAGE_3, checkPixelIsWhite);
 		end = std::chrono::steady_clock::now();
 
 		auto duration_p3_s2 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << "(mask filter) " << duration_p3_s2 << "ms" << endl;
+		average += (float)duration_p3_s1 + (float)duration_p3_s2;
 	}
-	cout << endl;
+
+	if (STAGE_3_SEQ_ITERATIONS > 0) average = average / (float)STAGE_3_SEQ_ITERATIONS;
+	cout << "Average: " << average << endl << endl;
+	average = 0.0f;
 
 	
 	// Part 3 parallel solution:
@@ -662,13 +691,17 @@ int main()
 		cout << duration_p3_p1 << "ms, ";
 
 		start = std::chrono::steady_clock::now();
-		MaskInvertParallel(TOP_1, OUT_STAGE_2_THRESHOLD, OUT_STAGE_3, checkPixelIsWhite);
+		MaskInvertParallel(IN_TOP_1, OUT_STAGE_2_THRESHOLD, OUT_STAGE_3, checkPixelIsWhite);
 		end = std::chrono::steady_clock::now();
 
 		auto duration_p3_p2 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << "(mask filter) " << duration_p3_p2 << "ms" << endl;
+		average += (float)duration_p3_p1 + (float)duration_p3_p2;
 	}
-	cout << endl;
+
+	if (STAGE_3_PAR_ITERATIONS > 0) average = average / (float)STAGE_3_PAR_ITERATIONS;
+	cout << "Average: " << average << "ms" << endl << endl;
+	average = 0.0f;
 
 
 	return 0;
