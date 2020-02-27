@@ -1,98 +1,19 @@
 ﻿  main.cpp
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(93,36): warning C4244: 'argument': conversion from 'uint64_t' to 'unsigned int', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(93,29): warning C4244: 'argument': conversion from 'uint64_t' to 'unsigned int', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(164,60): warning C4244: 'argument': conversion from 'double' to '_Ty', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(97,24): warning C4244: 'initializing': conversion from 'uint64_t' to 'unsigned int', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(98,25): warning C4244: 'initializing': conversion from 'uint64_t' to 'unsigned int', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(162,60): warning C4244: 'argument': conversion from 'double' to '_Ty', possible loss of data
           with
           [
               _Ty=float
           ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(182,63): warning C4244: 'argument': conversion from 'float' to 'const unsigned int', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(182,76): warning C4244: 'argument': conversion from 'float' to 'const unsigned int', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(222,31): warning C4018: '>=': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(229,32): warning C4018: '>=': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(232,55): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(232,45): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(278,16): warning C4018: '>=': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(283,17): warning C4018: '>=': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(285,84): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(285,80): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(382,10): warning C4244: 'initializing': conversion from 'Value' to 'int', possible loss of data
-          with
-          [
-              Value=float
-          ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Libraries\tbb_4_4_2\include\tbb\parallel_reduce.h(325,101): warning C4244: 'argument': conversion from 'const Value' to 'int', possible loss of data
-          with
-          [
-              Value=float
-          ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Libraries\tbb_4_4_2\include\tbb\parallel_reduce.h(324): message : while compiling class template member function 'void tbb::internal::lambda_reduce_body<Range,Value,RealBody,Reduction>::join(tbb::internal::lambda_reduce_body<Range,Value,RealBody,Reduction> &)'
-          with
-          [
-              Range=tbb::blocked_range<int>,
-              Value=float,
-              RealBody=PixelsThatMeetCriteriaParallel::<lambda_d48a2980ddfd3c9e2df681cfb9d949e8>,
-              Reduction=PixelsThatMeetCriteriaParallel::<lambda_ed3a3d24d69b594392a6a4b75c533d1e>
-          ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Libraries\tbb_4_4_2\include\tbb\parallel_reduce.h(69): message : see reference to function template instantiation 'void tbb::internal::lambda_reduce_body<Range,Value,RealBody,Reduction>::join(tbb::internal::lambda_reduce_body<Range,Value,RealBody,Reduction> &)' being compiled
-          with
-          [
-              Range=tbb::blocked_range<int>,
-              Value=float,
-              RealBody=PixelsThatMeetCriteriaParallel::<lambda_d48a2980ddfd3c9e2df681cfb9d949e8>,
-              Reduction=PixelsThatMeetCriteriaParallel::<lambda_ed3a3d24d69b594392a6a4b75c533d1e>
-          ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Libraries\tbb_4_4_2\include\tbb\parallel_reduce.h(432): message : see reference to class template instantiation 'tbb::internal::lambda_reduce_body<Range,Value,RealBody,Reduction>' being compiled
-          with
-          [
-              Range=tbb::blocked_range<int>,
-              Value=float,
-              RealBody=PixelsThatMeetCriteriaParallel::<lambda_d48a2980ddfd3c9e2df681cfb9d949e8>,
-              Reduction=PixelsThatMeetCriteriaParallel::<lambda_ed3a3d24d69b594392a6a4b75c533d1e>
-          ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(397): message : see reference to function template instantiation 'Value tbb::parallel_reduce<tbb::blocked_range<RowValue>,float,PixelsThatMeetCriteriaParallel::<lambda_d48a2980ddfd3c9e2df681cfb9d949e8>,PixelsThatMeetCriteriaParallel::<lambda_ed3a3d24d69b594392a6a4b75c533d1e>>(const Range &,const Value &,const RealBody &,const Reduction &)' being compiled
-          with
-          [
-              Value=float,
-              RowValue=int,
-              Range=tbb::blocked_range<int>,
-              RealBody=PixelsThatMeetCriteriaParallel::<lambda_d48a2980ddfd3c9e2df681cfb9d949e8>,
-              Reduction=PixelsThatMeetCriteriaParallel::<lambda_ed3a3d24d69b594392a6a4b75c533d1e>
-          ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Libraries\tbb_4_4_2\include\tbb\parallel_reduce.h(325,62): warning C4244: 'argument': conversion from 'const Value' to 'int', possible loss of data
-          with
-          [
-              Value=float
-          ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Libraries\tbb_4_4_2\include\tbb\parallel_reduce.h(325,36): warning C4244: '=': conversion from 'int' to 'Value', possible loss of data
-          with
-          [
-              Value=float
-          ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Libraries\tbb_4_4_2\include\tbb\parallel_reduce.h(322,69): warning C4244: 'argument': conversion from 'const Value' to 'int', possible loss of data
-          with
-          [
-              Value=float
-          ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Libraries\tbb_4_4_2\include\tbb\parallel_reduce.h(321): message : while compiling class template member function 'void tbb::internal::lambda_reduce_body<Range,Value,RealBody,Reduction>::operator ()(Range &)'
-          with
-          [
-              Range=tbb::blocked_range<int>,
-              Value=float,
-              RealBody=PixelsThatMeetCriteriaParallel::<lambda_d48a2980ddfd3c9e2df681cfb9d949e8>,
-              Reduction=PixelsThatMeetCriteriaParallel::<lambda_ed3a3d24d69b594392a6a4b75c533d1e>
-          ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Libraries\tbb_4_4_2\include\tbb\parallel_reduce.h(151): message : see reference to function template instantiation 'void tbb::internal::lambda_reduce_body<Range,Value,RealBody,Reduction>::operator ()(Range &)' being compiled
-          with
-          [
-              Range=tbb::blocked_range<int>,
-              Value=float,
-              RealBody=PixelsThatMeetCriteriaParallel::<lambda_d48a2980ddfd3c9e2df681cfb9d949e8>,
-              Reduction=PixelsThatMeetCriteriaParallel::<lambda_ed3a3d24d69b594392a6a4b75c533d1e>
-          ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Libraries\tbb_4_4_2\include\tbb\parallel_reduce.h(322,36): warning C4244: '=': conversion from 'int' to 'Value', possible loss of data
-          with
-          [
-              Value=float
-          ]
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(180,63): warning C4244: 'argument': conversion from 'float' to 'const unsigned int', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(180,76): warning C4244: 'argument': conversion from 'float' to 'const unsigned int', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(220,31): warning C4018: '>=': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(227,32): warning C4018: '>=': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(230,55): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(230,45): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(276,16): warning C4018: '>=': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(281,17): warning C4018: '>=': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(283,84): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(283,80): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
   RGB_ProcessingWin.vcxproj -> D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Debug\RGB_ProcessingWin.exe
