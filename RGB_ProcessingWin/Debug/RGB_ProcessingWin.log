@@ -6,14 +6,14 @@ D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(
           ]
 D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(79,63): warning C4244: 'argument': conversion from 'float' to 'const unsigned int', possible loss of data
 D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(79,76): warning C4244: 'argument': conversion from 'float' to 'const unsigned int', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(420,33): warning C4018: '<': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(422,34): warning C4018: '<': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(431,27): warning C4018: '>=': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(438,28): warning C4018: '>=': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(441,60): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(441,50): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(519,17): warning C4018: '>=': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(524,18): warning C4018: '>=': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(526,90): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(526,86): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(386,34): warning C4018: '<': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(388,35): warning C4018: '<': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(397,28): warning C4018: '>=': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(404,29): warning C4018: '>=': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(407,61): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(407,51): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(435,18): warning C4018: '>=': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(440,19): warning C4018: '>=': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(442,91): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(442,87): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
   RGB_ProcessingWin.vcxproj -> D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Debug\RGB_ProcessingWin.exe
