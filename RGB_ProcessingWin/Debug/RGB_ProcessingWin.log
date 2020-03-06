@@ -1,18 +1,19 @@
 ﻿  main.cpp
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(63,60): warning C4244: 'argument': conversion from 'double' to '_Ty', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(61,60): warning C4244: 'argument': conversion from 'double' to '_Ty', possible loss of data
           with
           [
               _Ty=float
           ]
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(81,63): warning C4244: 'argument': conversion from 'float' to 'const unsigned int', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(81,76): warning C4244: 'argument': conversion from 'float' to 'const unsigned int', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(153,24): warning C4244: 'initializing': conversion from 'uint64_t' to 'unsigned int', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(222,31): warning C4018: '>=': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(229,32): warning C4018: '>=': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(232,55): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(232,45): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(305,16): warning C4018: '>=': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(310,17): warning C4018: '>=': signed/unsigned mismatch
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(312,84): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(312,80): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(79,63): warning C4244: 'argument': conversion from 'float' to 'const unsigned int', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(79,76): warning C4244: 'argument': conversion from 'float' to 'const unsigned int', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(420,33): warning C4018: '<': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(422,34): warning C4018: '<': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(431,27): warning C4018: '>=': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(438,28): warning C4018: '>=': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(441,60): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(441,50): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(519,17): warning C4018: '>=': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(524,18): warning C4018: '>=': signed/unsigned mismatch
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(526,90): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\main.cpp(526,86): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
   RGB_ProcessingWin.vcxproj -> D:\Matt\Documents\GitRepos\ImageProcessingCoursework\RGB_ProcessingWin\Debug\RGB_ProcessingWin.exe

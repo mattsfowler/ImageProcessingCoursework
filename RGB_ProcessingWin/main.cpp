@@ -21,8 +21,6 @@
 using namespace std;
 using namespace tbb;
 
-
-
 // -------------------- TYPES --------------------
 
 struct pixel_rgb
@@ -83,394 +81,39 @@ public:
 	}
 };
 
-
-
-// -------------------- PART 1 --------------------
-
-// Combines the pixels of one image with the pixels of another. Both images must have the same dimensions. 
-bool CombineImagesSerial(char* inImagePathA, char* inImagePathB, char* outImagePath, function<pixel_rgb(pixel_rgb, pixel_rgb)> fn)
-{
-	// Load input images from disk
-	fipImage imgInA;
-	fipImage imgInB;
-	imgInA.load(inImagePathA);
-	imgInB.load(inImagePathB);
-	imgInA.convertTo24Bits();
-	imgInB.convertTo24Bits();
-
-	// Both input images must have the same dimensions
-	if (imgInA.getWidth() != imgInB.getWidth() || imgInA.getHeight() != imgInB.getHeight()) return false;
-
-	// Image dimensions
-	unsigned int width = imgInA.getWidth();
-	unsigned int height = imgInA.getHeight();
-	unsigned int numPixels = width * height;
-
-	// Iterate over each pixel and apply the given function
-	pixel_rgb* aPointer = (pixel_rgb*)imgInA.accessPixels(); // also acts as the output image
-	pixel_rgb* bPointer = (pixel_rgb*)imgInB.accessPixels();
-	for (unsigned int pixel = 0; pixel < numPixels; pixel++, aPointer++, bPointer++)
-	{
-		*aPointer = fn(*aPointer, *bPointer);
-	}
-
-	// Save output image to disk
-	return imgInA.save(outImagePath);
-}
-
-
 // A component of ComineImagesParallel. Combines only a sub-section of the given images.
-void CombineSubImage(pixel_rgb* aPointer, pixel_rgb* bPointer, pixel_rgb* outPointer, unsigned int numIterations, function<pixel_rgb(pixel_rgb, pixel_rgb)> fn)
+void CombineSubImageAnd(pixel_rgb* aPointer, pixel_rgb* bPointer, pixel_rgb* outPointer, unsigned int numIterations)
 {
+	// White and black pixel definitions
+	pixel_rgb WHITE_PIXEL;
+	pixel_rgb BLACK_PIXEL;
+	WHITE_PIXEL.r = 255; WHITE_PIXEL.g = 255; WHITE_PIXEL.b = 255;
+	BLACK_PIXEL.r = 0; BLACK_PIXEL.g = 0; BLACK_PIXEL.b = 0;
 	for (unsigned int pixel = 0; pixel < numIterations; pixel++, aPointer++, bPointer++, outPointer++)
 	{
-		*outPointer = fn(*aPointer, *bPointer);
-	}
-}
-
-// Combines the pixels of one image with the pixels of another. Both images must have the same dimensions. 
-bool CombineImagesParallel(char* inImagePathA, char* inImagePathB, char* outImagePath, uint64_t numThreads, function<pixel_rgb(pixel_rgb, pixel_rgb)> fn)
-{
-	// Load input images from disk as FreeImagePlus images
-	fipImage imgInA;
-	fipImage imgInB;
-	imgInA.load(inImagePathA);
-	imgInB.load(inImagePathB);
-	imgInA.convertTo24Bits();
-	imgInB.convertTo24Bits();
-
-	// Both input images must have the same dimensions
-	if (imgInA.getWidth() != imgInB.getWidth() || imgInA.getHeight() != imgInB.getHeight()) return false;
-
-	// Create an empty output image with the same dimensions as the inputs
-	unsigned int width = imgInA.getWidth();
-	unsigned int height = imgInA.getHeight();
-	unsigned int numPixels = width * height;
-	fipImage imgOut(FIT_BITMAP, width, height, 24);
-
-	// Create threads to process smaller sub-images
-	vector<thread> threads;
-	unsigned int stepsize = numPixels / numThreads;
-	unsigned int remainder = numPixels % numThreads;
-	pixel_rgb* aPointer = (pixel_rgb*)imgInA.accessPixels();
-	pixel_rgb* bPointer = (pixel_rgb*)imgInB.accessPixels();
-	pixel_rgb* outPointer = (pixel_rgb*)imgOut.accessPixels();
-	for (int i = 0; i < numThreads; i++)
-	{
-		if (i == 0) 
+		if (aPointer->r == bPointer->r
+			&& aPointer->g == bPointer->g
+			&& aPointer->b == bPointer->b)
 		{
-			threads.push_back(thread(CombineSubImage, aPointer, bPointer, outPointer, stepsize + remainder, fn));
-			aPointer += stepsize + remainder;
-			bPointer += stepsize + remainder;
-			outPointer += stepsize + remainder;
+			*aPointer = BLACK_PIXEL;
 		}
 		else
 		{
-			threads.push_back(thread(CombineSubImage, aPointer, bPointer, outPointer, stepsize, fn));
-			aPointer += stepsize;
-			bPointer += stepsize;
-			outPointer += stepsize;
+			*aPointer = WHITE_PIXEL;
 		}
 	}
-
-	// Wait for the threads to finish executing
-	for (auto& thread : threads)
+}
+// A component of ComineImagesParallel. Combines only a sub-section of the given images.
+void CombineSubImageSum(pixel_rgb* aPointer, pixel_rgb* bPointer, pixel_rgb* outPointer, unsigned int numIterations)
+{
+	for (unsigned int pixel = 0; pixel < numIterations; pixel++, aPointer++, bPointer++, outPointer++)
 	{
-		thread.join();
+		aPointer->r = (aPointer->r / (unsigned char)2) + (bPointer->r / (unsigned char)2);
+		aPointer->g = (aPointer->g / (unsigned char)2) + (bPointer->g / (unsigned char)2);
+		aPointer->b = (aPointer->b / (unsigned char)2) + (bPointer->b / (unsigned char)2);
 	}
-
-	// Save output image to disk
-	return imgOut.save(outImagePath);
 }
 
-
-
-// -------------------- PART 2 --------------------
-
-// Blurs the input image using the stencil pattern. The coefficients are defined by the given functor.
-bool BlurImageSerial(char* inImagePath, char* outImagePath, int kradius, StencilTask& STask)
-{
-	// Load input image from disk into memory
-	fipImage imgIn;
-	imgIn.load(inImagePath);
-	imgIn.convertToFloat();
-
-	// Load empty output image into memory
-	unsigned int width = imgIn.getWidth();
-	unsigned int height = imgIn.getHeight();
-	unsigned int numPixels = width * height;
-	fipImage imgOut(FIT_FLOAT, width, height, 32);
-
-	// Setup variables for accessing memory
-	float* inPointer = (float*)imgIn.accessPixels();
-	float* outPointer = (float*)imgOut.accessPixels();
-	float sum;
-	unsigned int stencilIndex = 0;
-
-	// Iterate over all pixels linearly
-	for (unsigned int yOrigin = 0; yOrigin < height; yOrigin++)
-	{
-		for (unsigned int xOrigin = 0; xOrigin < width; xOrigin++, outPointer++)
-		{
-			sum = 0.0f;
-
-			for (int yStencil = -(kradius); yStencil <= kradius; yStencil++)
-			{
-				// Make sure that the stencil's y-coord is within range. If not, snap to the nearest border pixel.
-				int absoluteYStencil = (int)yOrigin + yStencil;
-				if (absoluteYStencil < 0) absoluteYStencil = 0;
-				else if (absoluteYStencil >= height) absoluteYStencil = height - 1;
-
-				for (int xStencil = -(kradius); xStencil <= kradius; xStencil++)
-				{
-					// Make sure that the stencil's x-coord is within range. If not, snap to the nearest border pixel.
-					int absoluteXStencil = (int)xOrigin + xStencil;
-					if (absoluteXStencil < 0) absoluteXStencil = 0;
-					else if (absoluteXStencil >= width) absoluteXStencil = width - 1;
-
-					stencilIndex = (absoluteYStencil * width) + absoluteXStencil;
-					sum += inPointer[stencilIndex] * STask(xStencil, yStencil);
-				}
-			}
-			*outPointer = sum;
-		}
-	}
-
-	// Save output image to disk
-	imgOut.convertToType(FREE_IMAGE_TYPE::FIT_BITMAP);
-	imgOut.convertTo24Bits();
-	return imgOut.save(outImagePath);
-}
-
-// For each pixel in the input image, apply the given function to it's value. 
-bool ApplyToImageSerial(char* inImagePath, char* outImagePath, function<pixel_rgb(pixel_rgb)> fn)
-{
-	// Load input images from disk as FreeImagePlus images
-	fipImage imgIn;
-	imgIn.load(inImagePath);
-	imgIn.convertTo24Bits();
-
-	// Create an empty output image with the same dimensions as the inputs
-	unsigned int width = imgIn.getWidth();
-	unsigned int height = imgIn.getHeight();
-	unsigned int numPixels = width * height;
-
-	// Iterate over each pixel and apply the given function
-	pixel_rgb* inPointer = (pixel_rgb*)imgIn.accessPixels();
-	for (unsigned int pixel = 0; pixel < numPixels; pixel++, inPointer++)
-	{
-		*inPointer = fn(*inPointer);
-	}
-
-	// Save output image to disk
-	return imgIn.save(outImagePath);
-}
-
-
-// Blurs the input image using the stencil pattern. The coefficients are defined by the given functor.
-bool BlurImageParallel(char* inImagePath, char* outImagePath, int kradius, StencilTask& STask)
-{
-	fipImage imgIn;
-	imgIn.load(inImagePath);
-	imgIn.convertToFloat();
-
-	// Load empty output image into memory
-	unsigned int width = imgIn.getWidth();
-	unsigned int height = imgIn.getHeight();
-	unsigned int numPixels = width * height;
-	fipImage imgOut(FIT_FLOAT, width, height, 32);
-
-	// Iterate over all pixels using TBB parallel_for
-	float* inPointer = (float*)imgIn.accessPixels();
-	float* outPointer = (float*)imgOut.accessPixels();
-
-	// For each pixel in the input...
-	parallel_for(blocked_range2d<int>(0, (int)height, 128, 0, (int)width, 128), [&](const blocked_range2d<int>& dim)
-	{
-			int xstart = dim.cols().begin();
-			int ystart = dim.rows().begin();
-			int xend = dim.cols().end();
-			int yend = dim.rows().end();
-			int xsum = 0;
-			int ysum = 0;
-
-			for (int x = xstart; x != xend; x++) 
-			{
-				for (int y = ystart; y != yend; y++)
-				{
-					for (int kx = -kradius; kx <= kradius; kx++)
-					{
-						xsum = x + kx;
-						if (xsum < 0) xsum = 0;
-						if (xsum >= width) xsum = width - 1;
-						for (int ky = -kradius; ky <= kradius; ky++)
-						{
-							ysum = y + ky;
-							if (ysum < 0) ysum = 0;
-							if (ysum >= height) ysum = height - 1;
-
-							outPointer[(y * width) + x] += inPointer[(ysum * width) + xsum] * STask(kx, ky);
-						}
-					}
-				}
-			}
-	});
-
-	// Save output image to disk
-	imgOut.convertToType(FREE_IMAGE_TYPE::FIT_BITMAP);
-	imgOut.convertTo24Bits();
-	return imgOut.save(outImagePath);
-}
-
-// For each pixel in the input image, apply the given function to it's value. 
-bool ApplyToImageParallel(char* inImagePath, char* outImagePath, function<pixel_rgb(pixel_rgb)> fn)
-{
-	// Load input images from disk as FreeImagePlus images
-	fipImage imgIn;
-	imgIn.load(inImagePath);
-	imgIn.convertTo24Bits();
-
-	unsigned int numPixels = imgIn.getWidth() * imgIn.getHeight();
-
-	// Iterate over each pixel and apply the given function
-	pixel_rgb* inPointer = (pixel_rgb*)imgIn.accessPixels();
-	parallel_for(blocked_range<int>(0, (int)numPixels, 1024), [&](const blocked_range<int>& range) {
-		for (int i = range.begin(); i < range.end(); i++)
-		{
-			inPointer[i] = fn(inPointer[i]);
-		}
-	});
-
-	// Save output image to disk
-	return imgIn.save(outImagePath);
-}
-
-
-
-// -------------------- PART 3 --------------------
-
-// Returns the number of pixels that meet the criteria given.
-int PixelsThatMeetCriteriaSerial(char* inImagePath, function<bool(pixel_rgb)> criteria)
-{
-	// Load input images from disk as FreeImagePlus images
-	fipImage imgIn;
-	imgIn.load(inImagePath);
-	imgIn.convertTo24Bits();
-	unsigned int numPixels = imgIn.getWidth() * imgIn.getHeight();
-
-	// Iterate over each pixel and count how many pixels meet the given criteria
-	int sum = 0;
-	pixel_rgb* inPointer = (pixel_rgb*)imgIn.accessPixels();
-	for (unsigned int pixel = 0; pixel < numPixels; pixel++, inPointer++)
-	{
-		if (criteria(*inPointer)) sum++;
-	}
-	return sum;
-}
-
-// Inverts the pixels in the input image, where the corresponding pixel in the mask meets the given condition.
-bool MaskInvertSerial(char* inImagePath, char* maskImagePath, char* outImagePath, function<bool(pixel_rgb)> maskCondition)
-{
-	// Load the input image and the mask from the disk
-	fipImage imgIn;
-	fipImage imgMask;
-	imgIn.load(inImagePath);
-	imgMask.load(maskImagePath);
-	imgIn.convertTo24Bits();
-	imgMask.convertTo24Bits();
-
-	// Both input images must have the same dimensions
-	if (imgIn.getWidth() != imgMask.getWidth() || imgIn.getHeight() != imgMask.getHeight()) return false;
-	unsigned int numPixels = imgIn.getWidth() * imgIn.getHeight();
-
-	// For each pixel in the input, check that the corresponding pixel in the mask meets the condition
-	// If it does invert the pixel in the input image
-	pixel_rgb* inPointer = (pixel_rgb*)imgIn.accessPixels();
-	pixel_rgb* maskPointer = (pixel_rgb*)imgMask.accessPixels();
-	for (unsigned int pixel = 0; pixel < numPixels; pixel++, inPointer++, maskPointer++)
-	{
-		if (maskCondition(*maskPointer))
-		{
-			inPointer->r = 255 - inPointer->r;
-			inPointer->g = 255 - inPointer->g;
-			inPointer->b = 255 - inPointer->b;
-		}
-	}
-
-	// Save result to the disk
-	return imgIn.save(outImagePath);
-}
-
-
-// Returns the number of pixels that meet the criteria given.
-int PixelsThatMeetCriteriaParallel(char* inImagePath, function<bool(pixel_rgb)> criteria)
-{
-	// Load input images from disk as FreeImagePlus images
-	fipImage imgIn;
-	imgIn.load(inImagePath);
-	imgIn.convertTo24Bits();
-	int numPixels = imgIn.getWidth() * imgIn.getHeight();
-
-	// Iterate over each pixel and count how many pixels meet the given criteria
-	pixel_rgb* inPointer = (pixel_rgb*)imgIn.accessPixels();
-	int sum = parallel_reduce(
-		blocked_range<int>(0, numPixels, 1024),
-		0,
-
-		[&](const blocked_range<int>& range, int initValue) {
-			for (int i = range.begin(); i != range.end(); i++)
-			{
-				if (criteria(inPointer[i])) initValue++;
-			}
-			return initValue;
-		},
-
-		[&](int a, int b) {
-			return a + b;
-		}
-	);
-
-	return sum;
-}
-
-// Inverts the pixels in the input image, where the corresponding pixel in the mask meets the given condition.
-bool MaskInvertParallel(char* inImagePath, char* maskImagePath, char* outImagePath, function<bool(pixel_rgb)> maskCondition)
-{
-	// Load the input image and the mask from the disk
-	fipImage imgIn;
-	fipImage imgMask;
-	imgIn.load(inImagePath);
-	imgMask.load(maskImagePath);
-	imgIn.convertTo24Bits();
-	imgMask.convertTo24Bits();
-
-	// Both input images must have the same dimensions
-	if (imgIn.getWidth() != imgMask.getWidth() || imgIn.getHeight() != imgMask.getHeight()) return false;
-	unsigned int numPixels = imgIn.getWidth() * imgIn.getHeight();
-
-	// For each pixel in the input, check that the corresponding pixel in the mask meets the condition
-	// If it does invert the pixel in the input image
-	pixel_rgb* inPointer = (pixel_rgb*)imgIn.accessPixels();
-	pixel_rgb* maskPointer = (pixel_rgb*)imgMask.accessPixels();
-	parallel_for(blocked_range<int>(0, numPixels, 1024), [&](blocked_range<int>& range) {
-		for (int p = range.begin(); p < range.end(); p++)
-		{
-			if (maskCondition(maskPointer[p]))
-			{
-				inPointer[p].r = 255 - inPointer[p].r;
-				inPointer[p].g = 255 - inPointer[p].g;
-				inPointer[p].b = 255 - inPointer[p].b;
-			}
-		}
-	});
-
-	// Save result to the disk
-	return imgIn.save(outImagePath);
-}
-
-
-
-// MAIN FUNCTION
 
 int main()
 {
@@ -490,63 +133,120 @@ int main()
 	char OUT_STAGE_3[] = "../Images/stage3_final.png";
 
 	// Number of times each stage will be executed
-	const int STAGE_1_SEQ_ITERATIONS = 5;
-	const int STAGE_1_PAR_ITERATIONS = 5;
-	const int STAGE_2_SEQ_ITERATIONS = 5;
-	const int STAGE_2_PAR_ITERATIONS = 5;
-	const int STAGE_3_SEQ_ITERATIONS = 5;
-	const int STAGE_3_PAR_ITERATIONS = 5;
+	const int STAGE_1_SEQ_ITERATIONS = 3;
+	const int STAGE_1_PAR_ITERATIONS = 3;
+	const int STAGE_2_SEQ_ITERATIONS = 1;
+	const int STAGE_2_PAR_ITERATIONS = 1;
+	const int STAGE_3_SEQ_ITERATIONS = 3;
+	const int STAGE_3_PAR_ITERATIONS = 3;
 	std::chrono::steady_clock::time_point start;
 	std::chrono::steady_clock::time_point end;
 	float average = 0.0f;
 
+	// FIP image objects:
+	fipImage imgInputA;
+	fipImage imgInputB;
+	fipImage imgOutput;
+	// White and black pixel definitions
+	pixel_rgb WHITE_PIXEL;
+	pixel_rgb BLACK_PIXEL;
+	WHITE_PIXEL.r = 255; WHITE_PIXEL.g = 255; WHITE_PIXEL.b = 255;
+	BLACK_PIXEL.r = 0; BLACK_PIXEL.g = 0; BLACK_PIXEL.b = 0;
 	
 	//Part 1 (Image Comparison): -----------------DO NOT REMOVE THIS COMMENT----------------------------//
 	
-
-	// IF pixel 'a' is the same as pixel 'b', return a black pixel. Otherwise return a white one
-	auto and = [](pixel_rgb a, pixel_rgb b)->pixel_rgb 
-	{ 
-		pixel_rgb output;
-		if (a.r == b.r && a.g == b.g && a.b == b.b) 
-		{
-			output.r = 0;
-			output.g = 0;
-			output.b = 0;
-		}
-		else 
-		{
-			output.r = 255;
-			output.g = 255;
-			output.b = 255;
-		}
-		return output;
-	};
-
-	// return a new pixel by adding half of the RGB values of pixel 'a' to half of pixel 'b'
-	auto sum = [](pixel_rgb a, pixel_rgb b)->pixel_rgb 
-	{
-		pixel_rgb output;
-		output.r = (a.r / (unsigned char)2) + (b.r / (unsigned char)2);
-		output.g = (a.g / (unsigned char)2) + (b.g / (unsigned char)2);
-		output.b = (a.b / (unsigned char)2) + (b.b / (unsigned char)2);
-		return output;
-	};
-
 
 	// Part 1 sequential solution:
 	cout << "Part one (serial) (" << STAGE_1_SEQ_ITERATIONS << " runs):" << endl;
 	for (int i = 0; i < STAGE_1_SEQ_ITERATIONS; i++)
 	{
+		// COMBINE TOP
+		// Load images using Free Image Plus library
+		imgInputA.load(IN_TOP_1);
+		imgInputB.load(IN_TOP_2);
+		imgInputA.convertTo24Bits();
+		imgInputB.convertTo24Bits();
+		// Image dimensions
+		unsigned int numPixels = imgInputA.getWidth() * imgInputA.getHeight();
+		// Iterate over each pixel
+		pixel_rgb* aPointer = (pixel_rgb*)imgInputA.accessPixels(); // also acts as the output image
+		pixel_rgb* bPointer = (pixel_rgb*)imgInputB.accessPixels();
 		start = std::chrono::steady_clock::now();
-		CombineImagesSerial(IN_TOP_1, IN_TOP_2, OUT_STAGE_1_TOP, and);
-		CombineImagesSerial(IN_BOTTOM_1, IN_BOTTOM_2, OUT_STAGE_1_BOTTOM, and);
-		CombineImagesSerial(OUT_STAGE_1_TOP, OUT_STAGE_1_BOTTOM, OUT_STAGE_1_COMBINED, sum);
+		for (unsigned int pixel = 0; pixel < numPixels; pixel++, aPointer++, bPointer++)
+		{
+			if (aPointer->r == bPointer->r
+				&& aPointer->g == bPointer->g
+				&& aPointer->b == bPointer->b)
+			{
+				*aPointer = BLACK_PIXEL;
+			}
+			else
+			{
+				*aPointer = WHITE_PIXEL;
+			}
+		}
 		end = std::chrono::steady_clock::now();
+		// Save output image to disk
+		imgInputA.save(OUT_STAGE_1_TOP);
 
-		auto duration_p1_s = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-		cout << "  Run " << i+1 << ": " << duration_p1_s << "ms" << endl;
-		average += (float)duration_p1_s;
+		auto duration_p1_s1 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+		cout << "  Run " << i + 1 << ": (top) " << duration_p1_s1 << "ms, ";
+		average += (float)duration_p1_s1;
+
+		// COMBINE BOTTOM
+		// Load images using Free Image Plus library
+		imgInputA.load(IN_BOTTOM_1);
+		imgInputB.load(IN_BOTTOM_1);
+		imgInputA.convertTo24Bits();
+		imgInputB.convertTo24Bits();
+		// Iterate over each pixel
+		aPointer = (pixel_rgb*)imgInputA.accessPixels(); // also acts as the output image
+		bPointer = (pixel_rgb*)imgInputB.accessPixels();
+		start = std::chrono::steady_clock::now();
+		for (unsigned int pixel = 0; pixel < numPixels; pixel++, aPointer++, bPointer++)
+		{
+			if (aPointer->r == bPointer->r
+				&& aPointer->g == bPointer->g
+				&& aPointer->b == bPointer->b)
+			{
+				*aPointer = BLACK_PIXEL;
+			}
+			else
+			{
+				*aPointer = WHITE_PIXEL;
+			}
+		}
+		end = std::chrono::steady_clock::now();
+		// Save output image to disk
+		imgInputA.save(OUT_STAGE_1_BOTTOM);
+
+		auto duration_p1_s2 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+		cout << "(bottom) " << duration_p1_s2 << "ms, ";
+		average += (float)duration_p1_s2;
+
+		// COMBINE TOP AND BOTTOM
+		// Load images using Free Image Plus library
+		imgInputA.load(OUT_STAGE_1_TOP);
+		imgInputB.load(OUT_STAGE_1_BOTTOM);
+		imgInputA.convertTo24Bits();
+		imgInputB.convertTo24Bits();
+		// Iterate over each pixel
+		aPointer = (pixel_rgb*)imgInputA.accessPixels(); // also acts as the output image
+		bPointer = (pixel_rgb*)imgInputB.accessPixels();
+		start = std::chrono::steady_clock::now();
+		for (unsigned int pixel = 0; pixel < numPixels; pixel++, aPointer++, bPointer++)
+		{
+			aPointer->r = (aPointer->r / (unsigned char)2) + (bPointer->r / (unsigned char)2);
+			aPointer->g = (aPointer->g / (unsigned char)2) + (bPointer->g / (unsigned char)2);
+			aPointer->b = (aPointer->b / (unsigned char)2) + (bPointer->b / (unsigned char)2);
+		}
+		end = std::chrono::steady_clock::now();
+		// Save output image to disk
+		imgInputA.save(OUT_STAGE_1_COMBINED);
+
+		auto duration_p1_s3 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+		cout << "(combine) " << duration_p1_s3 << "ms" << endl;
+		average += (float)duration_p1_s3;
 	}
 
 	if (STAGE_1_SEQ_ITERATIONS > 0) average = average / (float)STAGE_1_SEQ_ITERATIONS;
@@ -557,16 +257,130 @@ int main()
 	// Part 1 parallel solution:
 	cout << "Part one (parallel) (" << STAGE_1_PAR_ITERATIONS << " runs):" << endl;
 	for (int i = 0; i < STAGE_1_PAR_ITERATIONS; i++)
-	{
+	{	
+		// COMBINE TOP
+		// Load input images from disk as FreeImagePlus images
+		imgInputA.load(IN_TOP_1);
+		imgInputB.load(IN_TOP_2);
+		imgInputA.convertTo24Bits();
+		imgInputB.convertTo24Bits();
+		// Create an empty output image with the same dimensions as the inputs
+		unsigned int numPixels = imgInputA.getWidth() * imgInputA.getHeight();
+		// Create threads to process smaller sub-images
+		vector<thread> threads;
+		unsigned int stepsize = numPixels / nt;
+		unsigned int remainder = numPixels % nt;
+		// Split image into segments that can be processed by different threads
+		pixel_rgb* aPointer = (pixel_rgb*)imgInputA.accessPixels();
+		pixel_rgb* bPointer = (pixel_rgb*)imgInputB.accessPixels();
 		start = std::chrono::steady_clock::now();
-		CombineImagesParallel(IN_TOP_1, IN_TOP_2, OUT_STAGE_1_TOP, nt, and);
-		CombineImagesParallel(IN_BOTTOM_1, IN_BOTTOM_2, OUT_STAGE_1_BOTTOM, nt, and);
-		CombineImagesParallel(OUT_STAGE_1_TOP, OUT_STAGE_1_BOTTOM, OUT_STAGE_1_COMBINED, nt, sum);
+		for (int i = 0; i < nt; i++)
+		{
+			if (i == 0)
+			{
+				threads.push_back(thread(CombineSubImageAnd, aPointer, bPointer, aPointer, stepsize + remainder));
+				aPointer += stepsize + remainder;
+				bPointer += stepsize + remainder;
+			}
+			else
+			{
+				threads.push_back(thread(CombineSubImageAnd, aPointer, bPointer, aPointer, stepsize));
+				aPointer += stepsize;
+				bPointer += stepsize;
+			}
+		}
+		// Wait for the threads to finish executing
+		for (auto& thread : threads)
+		{
+			thread.join();
+		}
 		end = std::chrono::steady_clock::now();
+		// Save output image to disk
+		imgInputA.save(OUT_STAGE_1_TOP);
 
-		auto duration_p1_p = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-		cout << "  Run " << i+1 << ": " << duration_p1_p << "ms" << endl;
-		average += (float)duration_p1_p;
+		auto duration_p1_p1 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+		cout << "  Run " << i + 1 << ": (top)" << duration_p1_p1 << "ms, ";
+		average += (float)duration_p1_p1;
+
+		// COMBINE BOTTOM
+		// Load input images from disk as FreeImagePlus images
+		imgInputA.load(IN_BOTTOM_1);
+		imgInputB.load(IN_BOTTOM_2);
+		imgInputA.convertTo24Bits();
+		imgInputB.convertTo24Bits();
+		// Reset thread vector
+		threads.clear();
+		// Split image into segments that can be processed by different threads
+		aPointer = (pixel_rgb*)imgInputA.accessPixels();
+		bPointer = (pixel_rgb*)imgInputB.accessPixels();
+		start = std::chrono::steady_clock::now();
+		for (int i = 0; i < nt; i++)
+		{
+			if (i == 0)
+			{
+				threads.push_back(thread(CombineSubImageAnd, aPointer, bPointer, aPointer, stepsize + remainder));
+				aPointer += stepsize + remainder;
+				bPointer += stepsize + remainder;
+			}
+			else
+			{
+				threads.push_back(thread(CombineSubImageAnd, aPointer, bPointer, aPointer, stepsize));
+				aPointer += stepsize;
+				bPointer += stepsize;
+			}
+		}
+		// Wait for the threads to finish executing
+		for (auto& thread : threads)
+		{
+			thread.join();
+		}
+		end = std::chrono::steady_clock::now();
+		// Save output image to disk
+		imgInputA.save(OUT_STAGE_1_BOTTOM);
+
+		auto duration_p1_p2 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+		cout << "(bottom) " << duration_p1_p2 << "ms, ";
+		average += (float)duration_p1_p2;
+
+		// COMBINE TOP AND BOTTOM
+		// Load input images from disk as FreeImagePlus images
+		imgInputA.load(OUT_STAGE_1_TOP);
+		imgInputB.load(OUT_STAGE_1_BOTTOM);
+		imgInputA.convertTo24Bits();
+		imgInputB.convertTo24Bits();
+		// Reset thread vector
+		threads.clear();
+		// Split image into segments that can be processed by different threads
+		aPointer = (pixel_rgb*)imgInputA.accessPixels();
+		bPointer = (pixel_rgb*)imgInputB.accessPixels();
+		start = std::chrono::steady_clock::now();
+		for (int i = 0; i < nt; i++)
+		{
+			if (i == 0)
+			{
+				threads.push_back(thread(CombineSubImageSum, aPointer, bPointer, aPointer, stepsize + remainder));
+				aPointer += stepsize + remainder;
+				bPointer += stepsize + remainder;
+			}
+			else
+			{
+				threads.push_back(thread(CombineSubImageSum, aPointer, bPointer, aPointer, stepsize));
+				aPointer += stepsize;
+				bPointer += stepsize;
+			}
+		}
+		// Wait for the threads to finish executing
+		for (auto& thread : threads)
+		{
+			thread.join();
+		}
+		end = std::chrono::steady_clock::now();
+		// Save output image to disk
+		imgInputA.save(OUT_STAGE_1_COMBINED);
+
+		auto duration_p1_p3 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+		cout << "(combine) " << duration_p1_p3 << "ms" << endl;
+		average += (float)duration_p1_p3;
 	}
 
 	if (STAGE_1_PAR_ITERATIONS > 0) average = average / (float)STAGE_1_PAR_ITERATIONS;
@@ -580,30 +394,82 @@ int main()
 	// blur parameters
 	float sigma = 0.8f;
 	int kernal_radius = 1;
-
-	// IF the given pixel is not black, return a white pixel. Otherwise return a black pixel
-	auto binaryThreshold = [](pixel_rgb x)->pixel_rgb { 
-		pixel_rgb white;
-		white.r = 255; white.g = 255; white.b = 255;
-		if (x.r != 0 || x.g != 0 || x.b != 0) return white;
-		else return x;
-	};
-
+	// Setup blur functor
+	GaussianBlur BlurFunc = GaussianBlur(sigma, kernal_radius);
 
 	// Part 2 sequential solution:
 	cout << "Part two (serial) (" << STAGE_2_SEQ_ITERATIONS << " runs): " << endl;
 	for (int i = 0; i < STAGE_2_SEQ_ITERATIONS; i++)
 	{
+		// GAUSSIAN BLUR
+		// Load input image from disk into memory
+		imgInputA.load(OUT_STAGE_1_COMBINED);
+		imgInputA.convertToFloat();
+		// Load empty output image into memory
+		unsigned int width = imgInputA.getWidth();
+		unsigned int height = imgInputA.getHeight();
+		unsigned int numPixels = width * height;
+		imgOutput = fipImage(FIT_FLOAT, width, height, 32);
+		// Setup variables for accessing memory
+		float* fInPointer = (float*)imgInputA.accessPixels();
+		float* fOutPointer = (float*)imgOutput.accessPixels();
+		unsigned int stencilIndex = 0;
+		float sum = 0.0f;
+		// Iterate over all pixels linearly
 		start = std::chrono::steady_clock::now();
-		BlurImageSerial(OUT_STAGE_1_COMBINED, OUT_STAGE_2_BLURRED, kernal_radius, GaussianBlur(sigma, kernal_radius));
+		for (int yOrigin = 0; yOrigin < height; yOrigin++)
+		{
+			for (int xOrigin = 0; xOrigin < width; xOrigin++, fOutPointer++)
+			{
+				sum = 0.0f;
+
+				for (int yStencil = -(kernal_radius); yStencil <= kernal_radius; yStencil++)
+				{
+					// Make sure that the stencil's y-coord is within range. If not, snap to the nearest border pixel.
+					int absoluteYStencil = yOrigin + yStencil;
+					if (absoluteYStencil < 0) absoluteYStencil = 0;
+					if (absoluteYStencil >= height) absoluteYStencil = height - 1;
+
+					for (int xStencil = -(kernal_radius); xStencil <= kernal_radius; xStencil++)
+					{
+						// Make sure that the stencil's x-coord is within range. If not, snap to the nearest border pixel.
+						int absoluteXStencil = xOrigin + xStencil;
+						if (absoluteXStencil < 0) absoluteXStencil = 0;
+						if (absoluteXStencil >= width) absoluteXStencil = width - 1;
+
+						stencilIndex = (absoluteYStencil * width) + absoluteXStencil;
+						sum += fInPointer[stencilIndex] * BlurFunc(xStencil, yStencil);
+					}
+				}
+				*fOutPointer = sum;
+			}
+		}
 		end = std::chrono::steady_clock::now();
+		// Save output image to disk
+		imgOutput.convertToType(FREE_IMAGE_TYPE::FIT_BITMAP);
+		imgOutput.convertTo24Bits();
+		imgOutput.save(OUT_STAGE_2_BLURRED);
 
 		auto duration_p2_s1 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << "  Run " << i+1 << ": (gaussian) " << duration_p2_s1 << "ms, ";
-
+		
+		// THRESHOLD (any non-black pixels become white)
+		// Load input images from disk as FreeImagePlus images
+		imgInputA.load(OUT_STAGE_2_BLURRED);
+		imgInputA.convertTo24Bits();
+		// Iterate over each pixel and apply the given function
+		pixel_rgb* inPointer = (pixel_rgb*)imgInputA.accessPixels();
 		start = std::chrono::steady_clock::now();
-		ApplyToImageSerial(OUT_STAGE_2_BLURRED, OUT_STAGE_2_THRESHOLD, binaryThreshold);
+		for (unsigned int pixel = 0; pixel < numPixels; pixel++, inPointer++)
+		{
+			if (inPointer->r != 0 || inPointer->g != 0 || inPointer->b != 0)
+			{
+				*inPointer = WHITE_PIXEL;
+			}
+		}
 		end = std::chrono::steady_clock::now();
+		// Save output image to disk
+		imgInputA.save(OUT_STAGE_2_THRESHOLD);
 
 		auto duration_p2_s2 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << "(threshold) " << ": " << duration_p2_s2 << "ms" << endl;
@@ -619,16 +485,79 @@ int main()
 	cout << "Part two (parallel) (" << STAGE_2_PAR_ITERATIONS << " runs): " << endl;
 	for (int i = 0; i < STAGE_2_PAR_ITERATIONS; i++)
 	{
+		// GAUSSIAN BLUR
+		// Load input image
+		imgInputA.load(OUT_STAGE_2_BLURRED);
+		imgInputA.convertToFloat();
+		// Load empty output image into memory
+		unsigned int width = imgInputA.getWidth();
+		unsigned int height = imgInputA.getHeight();
+		unsigned int numPixels = width * height;
+		imgOutput = fipImage(FIT_FLOAT, width, height, 32);
+		// Iterate over all pixels using TBB parallel_for
+		float* fInPointer = (float*)imgInputA.accessPixels();
+		float* fOutPointer = (float*)imgOutput.accessPixels();
+		// For each pixel in the input...
 		start = std::chrono::steady_clock::now();
-		BlurImageParallel(OUT_STAGE_1_COMBINED, OUT_STAGE_2_BLURRED, kernal_radius, GaussianBlur(sigma, kernal_radius));
+		parallel_for(blocked_range2d<int>(0, (int)height, 128, 0, (int)width, 128), [&](const blocked_range2d<int>& dim)
+			{
+				int xstart = dim.cols().begin();
+				int ystart = dim.rows().begin();
+				int xend = dim.cols().end();
+				int yend = dim.rows().end();
+				int xsum = 0;
+				int ysum = 0;
+
+				for (int x = xstart; x != xend; x++)
+				{
+					for (int y = ystart; y != yend; y++)
+					{
+						for (int kx = -kernal_radius; kx <= kernal_radius; kx++)
+						{
+							xsum = x + kx;
+							if (xsum < 0) xsum = 0;
+							if (xsum >= width) xsum = width - 1;
+							for (int ky = -kernal_radius; ky <= kernal_radius; ky++)
+							{
+								ysum = y + ky;
+								if (ysum < 0) ysum = 0;
+								if (ysum >= height) ysum = height - 1;
+
+								fOutPointer[(y * width) + x] += fInPointer[(ysum * width) + xsum] * BlurFunc(kx, ky);
+							}
+						}
+					}
+				}
+			}
+		);
 		end = std::chrono::steady_clock::now();
+		// Save output image to disk
+		imgOutput.convertToType(FREE_IMAGE_TYPE::FIT_BITMAP);
+		imgOutput.convertTo24Bits();
+		imgOutput.save(OUT_STAGE_2_BLURRED);
 
 		auto duration_p2_p1 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << "  Run " << i + 1 << ": (gaussian) " << duration_p2_p1 << "ms, ";
-
+		
+		// THRESHOLD
+		// Load input images from disk as FreeImagePlus images
+		imgInputA.load(OUT_STAGE_2_BLURRED);
+		imgInputA.convertTo24Bits();
+		// Iterate over each pixel and apply the given function
+		pixel_rgb* inPointer = (pixel_rgb*)imgInputA.accessPixels();
 		start = std::chrono::steady_clock::now();
-		ApplyToImageParallel(OUT_STAGE_2_BLURRED, OUT_STAGE_2_THRESHOLD, binaryThreshold);
+		parallel_for(blocked_range<int>(0, (int)numPixels, 1024), [&](const blocked_range<int>& range) {
+			for (int i = range.begin(); i < range.end(); i++)
+			{
+				if (inPointer[i].r != 0 || inPointer[i].g != 0 || inPointer[i].b != 0)
+				{
+					inPointer[i] = WHITE_PIXEL;
+				}
+			}
+		});
 		end = std::chrono::steady_clock::now();
+		// Save output image to disk
+		imgInputA.save(OUT_STAGE_2_THRESHOLD);
 
 		auto duration_p2_p2 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << "(threshold) " << ": " << duration_p2_p2 << "ms" << endl;
@@ -638,16 +567,9 @@ int main()
 	if (STAGE_2_PAR_ITERATIONS > 0) average = average / (float)STAGE_2_PAR_ITERATIONS;
 	cout << "Average: " << average << endl << endl;
 	average = 0.0f;
-
+	
 
 	//Part 3 (Image Mask): -----------------------DO NOT REMOVE THIS COMMENT----------------------------//
-
-
-	// IF pixel 'x' is white, return true. Otherwise return false
-	auto checkPixelIsWhite = [](pixel_rgb x)->bool {
-		if (x.r == 255 && x.g == 255 && x.b == 255) return true;
-		else return false;
-	};
 
 
 	// Part 3 sequential solution:
@@ -655,17 +577,54 @@ int main()
 	for (int i = 0; i < STAGE_3_SEQ_ITERATIONS; i++)
 	{
 		cout << "  Run " << i+1 << ": (count pixels) ";
+		
+		// NUMBER OF WHITE PIXELS
+		// Load input images from disk as FreeImagePlus images
+		imgInputB.load(OUT_STAGE_2_THRESHOLD);
+		imgInputB.convertTo24Bits();
+		// Image dimensions
+		unsigned int numPixels = imgInputB.getWidth() * imgInputB.getHeight();
+		// Iterate over each pixel and count how many pixels meet the given criteria
+		int sum = 0;
+		pixel_rgb* inPointer = (pixel_rgb*)imgInputB.accessPixels();
 		start = std::chrono::steady_clock::now();
-		int vals = PixelsThatMeetCriteriaSerial(OUT_STAGE_2_THRESHOLD, checkPixelIsWhite);
+		for (unsigned int pixel = 0; pixel < numPixels; pixel++, inPointer++)
+		{
+			if (inPointer->r == 255
+				&& inPointer->g == 255
+				&& inPointer->b == 255)
+			{
+				sum++;
+			}
+		}
 		end = std::chrono::steady_clock::now();
 
-		cout << vals << " pixels (" << ((float)vals / (5000.0f * 7000.0f)) * 100.0f << "%) - ";
+		cout << sum << " pixels (" << ((float)sum / (5000.0f * 7000.0f)) * 100.0f << "%) - ";
 		auto duration_p3_s1 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << duration_p3_s1 << "ms, ";
 
+		// Load the input image and the mask from the disk
+		imgInputA.load(IN_TOP_1);
+		imgInputA.convertTo24Bits();
+		// For each pixel in the input, check that the corresponding pixel in the mask meets the condition
+		// If it does invert the pixel in the input image
+		inPointer = (pixel_rgb*)imgInputA.accessPixels();
+		pixel_rgb* maskPointer = (pixel_rgb*)imgInputB.accessPixels();
 		start = std::chrono::steady_clock::now();
-		MaskInvertSerial(IN_TOP_1, OUT_STAGE_2_THRESHOLD, OUT_STAGE_3, checkPixelIsWhite);
+		for (unsigned int pixel = 0; pixel < numPixels; pixel++, inPointer++, maskPointer++)
+		{
+			if (maskPointer->r == 255
+				&& maskPointer->g == 255
+				&& maskPointer->b == 255)
+			{
+				inPointer->r = 255 - inPointer->r;
+				inPointer->g = 255 - inPointer->g;
+				inPointer->b = 255 - inPointer->b;
+			}
+		}
 		end = std::chrono::steady_clock::now();
+		// Save result to the disk
+		imgInputA.save(OUT_STAGE_3);
 
 		auto duration_p3_s2 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << "(mask filter) " << duration_p3_s2 << "ms" << endl;
@@ -682,17 +641,66 @@ int main()
 	for (int i = 0; i < STAGE_3_PAR_ITERATIONS; i++)
 	{
 		cout << "  Run " << i + 1 << ": (count pixels) ";
+		
+		// Load input images from disk as FreeImagePlus images
+		imgInputB.load(OUT_STAGE_2_THRESHOLD);
+		imgInputB.convertTo24Bits();
+		// Image dimensions
+		int numPixels = imgInputB.getWidth() * imgInputB.getHeight();
+		pixel_rgb* inPointer = (pixel_rgb*)imgInputB.accessPixels();
+		// Sum together values using parallel reduce
 		start = std::chrono::steady_clock::now();
-		int vals = PixelsThatMeetCriteriaParallel(OUT_STAGE_2_THRESHOLD, checkPixelIsWhite);
+		int sum = parallel_reduce(
+			blocked_range<int>(0, numPixels, 1024),
+			0,
+
+			[&](const blocked_range<int>& range, int initValue) {
+				for (int i = range.begin(); i != range.end(); i++)
+				{
+					if (inPointer[i].r == 255
+						&& inPointer[i].g == 255
+						&& inPointer[i].b == 255)
+					{
+						initValue++;
+					}
+				}
+				return initValue;
+			},
+
+			[&](int a, int b) {
+				return a + b;
+			}
+		);
 		end = std::chrono::steady_clock::now();
 
-		cout << vals << " pixels (" << ((float)vals / (5000.0f * 7000.0f)) * 100.0f << "%) - ";
+		cout << sum << " pixels (" << ((float)sum / (5000.0f * 7000.0f)) * 100.0f << "%) - ";
 		auto duration_p3_p1 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << duration_p3_p1 << "ms, ";
-
+		
+		// Load the input image and the mask from the disk
+		imgInputA.load(IN_TOP_1);
+		imgInputA.convertTo24Bits();
+		// For each pixel in the input, check that the corresponding pixel in the mask meets the condition
+		// If it does invert the pixel in the input image
+		inPointer = (pixel_rgb*)imgInputA.accessPixels();
+		pixel_rgb* maskPointer = (pixel_rgb*)imgInputB.accessPixels();
 		start = std::chrono::steady_clock::now();
-		MaskInvertParallel(IN_TOP_1, OUT_STAGE_2_THRESHOLD, OUT_STAGE_3, checkPixelIsWhite);
+		parallel_for(blocked_range<int>(0, numPixels, 1024), [&](blocked_range<int>& range) {
+			for (int p = range.begin(); p < range.end(); p++)
+			{
+				if (maskPointer[p].r == 255
+					&& maskPointer[p].g == 255
+					&& maskPointer[p].b == 255)
+				{
+					inPointer[p].r = 255 - inPointer[p].r;
+					inPointer[p].g = 255 - inPointer[p].g;
+					inPointer[p].b = 255 - inPointer[p].b;
+				}
+			}
+		});
 		end = std::chrono::steady_clock::now();
+		// Save result to the disk
+		imgInputA.save(OUT_STAGE_3);
 
 		auto duration_p3_p2 = chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		cout << "(mask filter) " << duration_p3_p2 << "ms" << endl;
@@ -702,7 +710,7 @@ int main()
 	if (STAGE_3_PAR_ITERATIONS > 0) average = average / (float)STAGE_3_PAR_ITERATIONS;
 	cout << "Average: " << average << "ms" << endl << endl;
 	average = 0.0f;
-
-
+	
+	cin;
 	return 0;
 }
